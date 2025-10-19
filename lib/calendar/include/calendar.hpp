@@ -1,4 +1,4 @@
-#ifndef CALENDARIO_H
+ #ifndef CALENDARIO_H
 #define CALENDARIO_H
 
 #include <iostream>
@@ -31,8 +31,11 @@ public:
     // Agrega un paquete al calendario en una hora específica
     void addPackage(int month, int day, int hour, const Package& pkg);
 
+    // Guarda un día completo desde un arreglo externo de 24 horas
+    void storeDay(int year, int month, int day, const Hour externalHours[24]);
+
     // Muestra todos los paquetes depositados y entregados en un día específico
-    void showPackagesByDay(int month, int day) const;
+    void showDay(int month, int day) const;
 };
 
 #endif
