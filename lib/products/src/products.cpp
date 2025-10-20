@@ -1,4 +1,3 @@
-#include "c:\\archivos\\Nicolas\\U. nacional\\4 semestre\\estrucutras\\ServicioPedidos-main\\lib\\products\\include\\products.hpp"
 #include <iostream>
 
 Products::Products() : id(0), name(""), HMade(0) {}
@@ -26,3 +25,4 @@ void initProducts() {
     storage.addProduct(laptop);
     storage.addProduct(microwave);
 }
+
