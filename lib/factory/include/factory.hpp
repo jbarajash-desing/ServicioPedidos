@@ -15,7 +15,7 @@ public:
     int urgency;            // Nivel de urgencia (1 = alta, 2 = media, 3 = baja)
     int fabricationTime;    // Tiempo total necesario para fabricar
     int remainingTime;      // Tiempo que falta para completar
-
+    int id;               // Identificador único del pedido
     Order(std::string name, int urgency, int fabricationTime);
 };
 
@@ -45,12 +45,12 @@ private:
     std::queue<Order> highPriority;           // Urgencia 1
     CircularQueue mediumPriority;             // Urgencia 2
     std::queue<Order> lowPriority;            // Urgencia 3
-
+    std::vector<Order> lastBatch;  
     std::queue<std::vector<Order>> outputQueue; // Cola de colas de pedidos completados
 
 public:
     Factory(int quantum);
-
+    std::vector<Order> getLastBatch();
     void receiveOrders(std::vector<std::vector<Order>>& ordersPerHour); // Recibe los pedidos por hora
     void process();          // Procesa todos los pedidos según prioridad
     void showQueues();       // Muestra el estado actual de las colas

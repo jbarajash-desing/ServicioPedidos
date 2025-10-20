@@ -1,11 +1,11 @@
-#ifndef CALENDARIO_H
-#define CALENDARIO_H
+#ifndef CALENDAR_HPP
+#define CALENDAR_HPP
 
 #include <iostream>
 #include <list>
 #include <string>
 using namespace std;
-
+//schedule
 // Estructura que representa un paquete con un ID, cliente y estado
 struct Package {
     int id;

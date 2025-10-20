@@ -7,7 +7,7 @@ Calendar::Calendar() {
 
 // Agrega un solo paquete al calendario en una hora específica
 void Calendar::addPackage(int month, int day, int hour, const Package& p) {
-    calendar[month][day][hour].push_back(p);
+    schedule[month][day][hour].push_back(p);
 }
 
 // Recibe un arreglo de 24 horas con listas de paquetes, y lo almacena en el calendario
@@ -15,7 +15,7 @@ void Calendar::storeDay(int year, int month, int day, const Hour externalHours[2
     // Recorre las 24 horas del día recibido
     for (int h = 0; h < 24; ++h) {
         for (const auto& pkg : externalHours[h]) {
-            calendar[month][day][h].push_back(pkg);
+            schedule[month][day][h].push_back(pkg);
         }
     }
     // Nota: el parámetro 'year' no se usa porque solo trabajamos con un año fijo (puede ser extendido)
@@ -28,7 +28,7 @@ void Calendar::showDay(int month, int day) const {
 
     // Recorre cada hora del día seleccionado
     for (int h = 0; h < 24; ++h) {
-        for (const auto& pkg : calendar[month][day][h]) {
+        for (const auto& pkg : schedule[month][day][h]) {
             if (pkg.status == "deposited")
                 deposited.push_back(pkg);
             else if (pkg.status == "delivered")

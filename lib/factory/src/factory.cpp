@@ -1,5 +1,7 @@
 #include "../include/factory.hpp"
-
+std::vector<Order> Factory::getLastBatch() {
+    return lastBatch; // o como guardes el último lote
+}
 // -------------------------------------------------------------
 // Implementación de la clase Order
 // -------------------------------------------------------------
@@ -104,6 +106,7 @@ void Factory::process() {
 
     // 4️⃣ Agregar los pedidos completados a la cola de salida
     outputQueue.push(completedOrders);
+    lastBatch = completedOrders;
 }
 
 // Muestra el estado de las colas
