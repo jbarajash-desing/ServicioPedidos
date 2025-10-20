@@ -1,14 +1,26 @@
+// Versión final de gui.cpp con corrección de salto automático y repetición de letras
+// Incluye temporizador en entrada de texto y espera de clic liberado
+
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-
+#include <filesystem>
+#include <chrono>
 #include "../../lib/factory/include/factory.hpp"
 #include "gui.hpp"
+#include "../../products/include/products.hpp"
+
+extern void initProducts();
+namespace fs = std::filesystem;
 
 namespace {
+using Clock = std::chrono::steady_clock;
+Clock::time_point lastKeyPress = Clock::now();
+bool clickReleased = true;
 
+// --- Componentes y helpers ---
 struct Button {
     sf::RectangleShape shape;
     sf::Text text;
@@ -22,25 +34,19 @@ Button makeButton(const sf::Font& font, const std::string& label, const sf::Vect
     button.shape.setFillColor(sf::Color(52, 84, 209));
     button.shape.setOutlineThickness(2.f);
     button.shape.setOutlineColor(sf::Color(33, 51, 140));
-
     button.text.setFont(font);
     button.text.setString(label);
     button.text.setCharacterSize(22);
     button.text.setFillColor(sf::Color::White);
-
     sf::FloatRect textBounds = button.text.getLocalBounds();
-    button.text.setOrigin(textBounds.left + textBounds.width / 2.f,
-                          textBounds.top + textBounds.height / 2.f);
+    button.text.setOrigin(textBounds.left + textBounds.width / 2.f, textBounds.top + textBounds.height / 2.f);
     button.text.setPosition(position.x + size.x / 2.f, position.y + size.y / 2.f);
     return button;
 }
 
 void updateButtonHover(Button& button, const sf::Vector2f& mousePosition) {
-    if (button.shape.getGlobalBounds().contains(mousePosition)) {
-        button.shape.setFillColor(sf::Color(66, 105, 232));
-    } else {
-        button.shape.setFillColor(sf::Color(52, 84, 209));
-    }
+    button.shape.setFillColor(button.shape.getGlobalBounds().contains(mousePosition)
+        ? sf::Color(66, 105, 232) : sf::Color(52, 84, 209));
 }
 
 sf::Text makeTitle(const sf::Font& font, const std::string& text, unsigned int size,
@@ -53,15 +59,16 @@ sf::Text makeTitle(const sf::Font& font, const std::string& text, unsigned int s
     return title;
 }
 
-sf::FloatRect computeOptionBounds(std::size_t index, float windowWidth, const sf::Vector2f& optionSize,
-                                  float startY, float spacing) {
-    float x = (windowWidth - optionSize.x) / 2.f;
-    float y = startY + static_cast<float>(index) * (optionSize.y + spacing);
-    return {x, y, optionSize.x, optionSize.y};
+sf::FloatRect computeGridBounds(int index, int cols, const sf::Vector2f& itemSize, float startX, float startY, float spacingX, float spacingY) {
+    int row = index / cols;
+    int col = index % cols;
+    float x = startX + col * (itemSize.x + spacingX);
+    float y = startY + row * (itemSize.y + spacingY);
+    return {x, y, itemSize.x, itemSize.y};
 }
 
-void drawOption(sf::RenderWindow& window, const sf::Font& font, const std::string& text,
-                const sf::FloatRect& bounds, const sf::Vector2f& mousePosition, bool isSelected) {
+void drawOptionBox(sf::RenderWindow& window, const sf::Font& font, const std::string& text,
+                   const sf::FloatRect& bounds, const sf::Vector2f& mousePosition, bool isSelected) {
     sf::RectangleShape box;
     box.setPosition(bounds.left, bounds.top);
     box.setSize({bounds.width, bounds.height});
@@ -70,256 +77,243 @@ void drawOption(sf::RenderWindow& window, const sf::Font& font, const std::strin
                                                                   : sf::Color(70, 70, 70)));
     box.setOutlineThickness(2.f);
     box.setOutlineColor(sf::Color(40, 40, 40));
+    window.draw(box);
 
-    sf::Text label(text, font, 22);
+    sf::Text label(text, font, 20);
     label.setFillColor(sf::Color::White);
     sf::FloatRect textBounds = label.getLocalBounds();
     label.setOrigin(textBounds.left + textBounds.width / 2.f, textBounds.top + textBounds.height / 2.f);
     label.setPosition(bounds.left + bounds.width / 2.f, bounds.top + bounds.height / 2.f);
-
-    window.draw(box);
     window.draw(label);
 }
 
-enum class AppState { MainMenu, PersonalOrder, Summary };
+// --- Variables globales ---
+const std::vector<std::string> monthOptions = {"Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"};
+const std::vector<int> daysPerMonth = {31,28,31,30,31,30,31,31,30,31,30,31};
+const std::vector<std::string> hourOptions = {"00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"};
+const std::vector<std::string> priorityOptions = {"Alta", "Media", "Baja"};
+std::vector<std::string> productList = []() {
+    std::vector<std::string> list;
+    if (fs::exists("products")) {
+        for (const auto& entry : fs::directory_iterator("products")) {
+            if (entry.is_regular_file()) {
+                list.push_back(entry.path().filename().string());
+            }
+        }
+    }
+    return list;
+}();
+
+int selectedMonth = -1;
+int selectedDay = -1;
+int selectedHour = -1;
+int selectedPriority = -1;
+int selectedProduct = -1;
+std::string clientName = "";
+bool typingName = false;
+int nextId = 1;
+
+void handleDateTimeSelection(sf::RenderWindow& window, const sf::Font& font, const sf::Vector2f& mousePosition, sf::Event& event) {
+    const sf::Vector2f boxSize(100.f, 50.f);
+    const float spacingX = 12.f, spacingY = 12.f;
+
+    // coordenadas del click basadas en el evento (si lo hay)
+    sf::Vector2f eventMousePos = mousePosition;
+    if (event.type == sf::Event::MouseButtonPressed || event.type == sf::Event::MouseButtonReleased) {
+        eventMousePos = window.mapPixelToCoords(sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
+    }
+
+    // 1) Seleccionar mes
+    if (selectedMonth == -1) {
+        sf::Text title = makeTitle(font, "Selecciona un mes", 28, 900.f, 60.f);
+        window.draw(title);
+        for (size_t i = 0; i < monthOptions.size(); ++i) {
+            sf::FloatRect bounds = computeGridBounds(i, 4, boxSize, 90.f, 120.f, spacingX, spacingY);
+            drawOptionBox(window, font, monthOptions[i], bounds, mousePosition, static_cast<int>(i) == selectedMonth);
+            if (event.type == sf::Event::MouseButtonPressed && bounds.contains(eventMousePos)) {
+                selectedMonth = static_cast<int>(i);
+                clickReleased = false;
+            }
+        }
+        return;
+    }
+
+    // 2) Seleccionar día
+    if (selectedDay == -1) {
+        sf::Text title = makeTitle(font, "Selecciona un dia", 28, 900.f, 60.f);
+        window.draw(title);
+        int days = daysPerMonth[selectedMonth];
+        for (int i = 0; i < days; ++i) {
+            sf::FloatRect bounds = computeGridBounds(i, 7, boxSize, 60.f, 120.f, spacingX, spacingY);
+            drawOptionBox(window, font, std::to_string(i + 1), bounds, mousePosition, i == selectedDay);
+            if (event.type == sf::Event::MouseButtonPressed && bounds.contains(eventMousePos)) {
+                selectedDay = i;
+                clickReleased = false;
+            }
+        }
+        return;
+    }
+
+    // 3) Seleccionar hora
+    if (selectedHour == -1) {
+        sf::Text title = makeTitle(font, "Selecciona una hora", 28, 900.f, 60.f);
+        window.draw(title);
+        for (size_t i = 0; i < hourOptions.size(); ++i) {
+            sf::FloatRect bounds = computeGridBounds(i, 6, boxSize, 60.f, 120.f, spacingX, spacingY);
+            drawOptionBox(window, font, hourOptions[i], bounds, mousePosition, static_cast<int>(i) == selectedHour);
+            if (event.type == sf::Event::MouseButtonPressed && bounds.contains(eventMousePos)) {
+                selectedHour = static_cast<int>(i);
+                clickReleased = false;
+            }
+        }
+        return;
+    }
+
+    // 4) Seleccionar prioridad
+    if (selectedPriority == -1) {
+        sf::Text title = makeTitle(font, "Selecciona prioridad", 28, 900.f, 60.f);
+        window.draw(title);
+        for (size_t i = 0; i < priorityOptions.size(); ++i) {
+            sf::FloatRect bounds = computeGridBounds(i, 3, boxSize, 150.f, 150.f, spacingX, spacingY);
+            drawOptionBox(window, font, priorityOptions[i], bounds, mousePosition, static_cast<int>(i) == selectedPriority);
+            if (event.type == sf::Event::MouseButtonPressed && bounds.contains(eventMousePos)) {
+                selectedPriority = static_cast<int>(i);
+                clickReleased = false;
+            }
+        }
+        return;
+    }
+
+    // 5) Ingresar nombre
+    if (clientName.empty() || typingName) {
+        sf::Text title = makeTitle(font, "Nombre del cliente:", 26, 900.f, 60.f);
+        window.draw(title);
+
+        sf::RectangleShape inputBox;
+        inputBox.setSize({600.f, 50.f});
+        inputBox.setPosition(150.f, 120.f);
+        inputBox.setFillColor(typingName ? sf::Color(90, 90, 90) : sf::Color(70, 70, 70));
+        inputBox.setOutlineThickness(2.f);
+        inputBox.setOutlineColor(sf::Color::White);
+        window.draw(inputBox);
+
+        sf::Text nameText((clientName.empty() && !typingName) ? "Escribe tu nombre..." : clientName + (typingName ? "|" : ""), font, 22);
+        nameText.setPosition(160.f, 130.f);
+        nameText.setFillColor(clientName.empty() ? sf::Color(150, 150, 150) : sf::Color::White);
+        window.draw(nameText);
+
+        if (event.type == sf::Event::MouseButtonPressed && inputBox.getGlobalBounds().contains(eventMousePos)) {
+            typingName = true;
+            clickReleased = false;
+        }
+
+        if (typingName && event.type == sf::Event::TextEntered) {
+            auto now = Clock::now();
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastKeyPress).count();
+            if (ms > 100) {
+                if (event.text.unicode == 8 && !clientName.empty()) clientName.pop_back();
+                else if (event.text.unicode == 13 && clientName.length() >= 3) typingName = false;
+                else if (event.text.unicode >= 32 && event.text.unicode < 128 && clientName.size() < 30)
+                    clientName += static_cast<char>(event.text.unicode);
+                lastKeyPress = now;
+            }
+        }
+        return;
+    }
+
+    // 6) Seleccionar producto
+    if (selectedProduct == -1) {
+        sf::Text title = makeTitle(font, "Selecciona producto", 28, 900.f, 60.f);
+        window.draw(title);
+        for (size_t i = 0; i < productList.size(); ++i) {
+            sf::FloatRect bounds = computeGridBounds(i, 3, boxSize, 100.f, 130.f, spacingX, spacingY);
+            drawOptionBox(window, font, productList[i], bounds, mousePosition, static_cast<int>(i) == selectedProduct);
+            if (event.type == sf::Event::MouseButtonPressed && bounds.contains(eventMousePos)) {
+                selectedProduct = static_cast<int>(i);
+                clickReleased = false;
+            }
+        }
+        return;
+    }
+
+    // 7) Resumen y confirmación
+    {
+        std::ostringstream summary;
+        summary << "Resumen del pedido\n\nCliente: " << clientName
+                << "\nFecha: " << (selectedDay + 1) << " de " << monthOptions[selectedMonth]
+                << "\nHora: " << hourOptions[selectedHour] << ":00"
+                << "\nPrioridad: " << priorityOptions[selectedPriority]
+                << "\nProducto: " << (selectedProduct >= 0 && selectedProduct < (int)productList.size() ? productList[selectedProduct] : "(ninguno)")
+                << "\nID generado: " << nextId << "\n";
+
+        sf::Text title = makeTitle(font, "Confirma tu pedido", 26, 900.f, 60.f);
+        window.draw(title);
+
+        sf::Text summaryText(summary.str(), font, 20);
+        summaryText.setFillColor(sf::Color::White);
+        summaryText.setPosition(80.f, 120.f);
+        window.draw(summaryText);
+
+        sf::Vector2f btnSize(180.f, 50.f);
+        Button confirm = makeButton(font, "Confirmar", btnSize, {600.f, 400.f});
+        Button cancel = makeButton(font, "Cancelar", btnSize, {380.f, 400.f});
+        updateButtonHover(confirm, mousePosition);
+        updateButtonHover(cancel, mousePosition);
+        window.draw(confirm.shape);
+        window.draw(confirm.text);
+        window.draw(cancel.shape);
+        window.draw(cancel.text);
+
+        if (event.type == sf::Event::MouseButtonPressed) {
+            if (confirm.shape.getGlobalBounds().contains(eventMousePos)) {
+                // Confirmar pedido: guardar o procesar
+                nextId++;
+                // Reiniciar estado para nuevo pedido
+                selectedMonth = selectedDay = selectedHour = selectedPriority = selectedProduct = -1;
+                clientName.clear();
+                typingName = false;
+            } else if (cancel.shape.getGlobalBounds().contains(eventMousePos)) {
+                // Volver a editar: regresar a seleccionar producto
+                selectedProduct = -1;
+            }
+            clickReleased = false;
+        }
+    }
+
+    if (event.type == sf::Event::MouseButtonReleased)
+        clickReleased = true;
+}
 
 } // namespace
 
 int runGui() {
-    sf::RenderWindow window(sf::VideoMode(900, 600), "Gestion de pedidos");
+    sf::RenderWindow window(sf::VideoMode(900, 600), "Gestión de pedidos");
     window.setFramerateLimit(60);
+    window.setVerticalSyncEnabled(true);
 
     sf::Font font;
     if (!font.loadFromFile("assets/Roboto-Regular.ttf")) {
-        std::cerr << "No se pudo cargar la fuente assets/Roboto-Regular.ttf. "
-                     "Coloca un archivo TTF en esa ruta.\n";
+        std::cerr << "No se pudo cargar la fuente.\n";
         return 1;
     }
 
-    Factory factory(5); // quantum = 5 unidades de tiempo
+    initProducts();
 
-    Button personalButton = makeButton(font, "Pedido personal", {320.f, 80.f}, {290.f, 230.f});
-    Button multipleButton = makeButton(font, "Pedido multiple (en desarrollo)", {320.f, 80.f}, {290.f, 340.f});
-
-    AppState state = AppState::MainMenu;
-    std::string infoMessage;
-    std::string summaryText;
-    std::vector<Order> processedOrders;
-
-    const std::vector<std::string> dayOptions = {
-        "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"};
-    const std::vector<std::string> typeOptions = {"Estandar", "Personalizado", "Express"};
-    const std::vector<int> typeDurations = {6, 12, 3};
-    const std::vector<std::string> priorityOptions = {"Alta", "Media", "Baja"};
-    const std::vector<int> priorityUrgencies = {1, 2, 3};
-
-    int personalStep = 0;
-    int selectedDay = -1;
-    int selectedType = -1;
-    int selectedPriority = -1;
-
-    const sf::Vector2f optionSize(360.f, 50.f);
-    const float optionStartY = 200.f;
-    const float optionSpacing = 14.f;
-
+    sf::Event event;
+    sf::Vector2f mouse;
     while (window.isOpen()) {
-        sf::Event event{};
         while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
-            } else if (event.type == sf::Event::MouseButtonPressed &&
-                       event.mouseButton.button == sf::Mouse::Left) {
-                sf::Vector2f mouse = window.mapPixelToCoords({event.mouseButton.x, event.mouseButton.y});
-
-                if (state == AppState::MainMenu) {
-                    if (personalButton.shape.getGlobalBounds().contains(mouse)) {
-                        state = AppState::PersonalOrder;
-                        personalStep = 0;
-                        selectedDay = selectedType = selectedPriority = -1;
-                        infoMessage.clear();
-                    } else if (multipleButton.shape.getGlobalBounds().contains(mouse)) {
-                        infoMessage = "La opcion de pedido multiple aun no esta disponible.";
-                    }
-                } else if (state == AppState::PersonalOrder) {
-                    Button backButton = makeButton(font, "Volver al menu", {180.f, 46.f}, {20.f, 20.f});
-                    if (backButton.shape.getGlobalBounds().contains(mouse)) {
-                        state = AppState::MainMenu;
-                        infoMessage.clear();
-                        continue;
-                    }
-
-                    if (personalStep < 3) {
-                        const std::vector<std::string>* currentOptions = nullptr;
-                        if (personalStep == 0) {
-                            currentOptions = &dayOptions;
-                        } else if (personalStep == 1) {
-                            currentOptions = &typeOptions;
-                        } else {
-                            currentOptions = &priorityOptions;
-                        }
-
-                        for (std::size_t i = 0; i < currentOptions->size(); ++i) {
-                            sf::FloatRect bounds = computeOptionBounds(i, static_cast<float>(window.getSize().x),
-                                                                       optionSize, optionStartY, optionSpacing);
-                            if (bounds.contains(mouse)) {
-                                if (personalStep == 0) {
-                                    selectedDay = static_cast<int>(i);
-                                } else if (personalStep == 1) {
-                                    selectedType = static_cast<int>(i);
-                                } else {
-                                    selectedPriority = static_cast<int>(i);
-                                }
-                                ++personalStep;
-                                break;
-                            }
-                        }
-                    } else {
-                        Button confirmButton = makeButton(font, "Confirmar pedido", {250.f, 60.f}, {325.f, 420.f});
-                        Button resetButton = makeButton(font, "Reiniciar seleccion", {250.f, 46.f}, {325.f, 500.f});
-
-                        if (confirmButton.shape.getGlobalBounds().contains(mouse)) {
-                            std::vector<std::vector<Order>> ordersPerHour(24);
-
-                            int urgency = priorityUrgencies.at(selectedPriority);
-                            int fabricationTime = typeDurations.at(selectedType);
-                            std::string orderName =
-                                "Personal_" + typeOptions.at(selectedType) + "_" + dayOptions.at(selectedDay);
-
-                            ordersPerHour[0].push_back(Order(orderName, urgency, fabricationTime));
-                            factory.receiveOrders(ordersPerHour);
-                            factory.process();
-                            processedOrders = factory.getLastBatch();
-
-                            std::ostringstream summary;
-                            summary << "Pedido personal creado:\n";
-                            summary << "  Dia: " << dayOptions.at(selectedDay) << "\n";
-                            summary << "  Tipo: " << typeOptions.at(selectedType) << "\n";
-                            summary << "  Prioridad: " << priorityOptions.at(selectedPriority) << "\n\n";
-                            summary << "Resultado del procesamiento:\n";
-                            for (const auto& order : processedOrders) {
-                                summary << "  - " << order.name << " (urgencia " << order.urgency << ")\n";
-                            }
-                            summaryText = summary.str();
-
-                            state = AppState::Summary;
-                            infoMessage.clear();
-                        } else if (resetButton.shape.getGlobalBounds().contains(mouse)) {
-                            personalStep = 0;
-                            selectedDay = selectedType = selectedPriority = -1;
-                        }
-                    }
-                } else if (state == AppState::Summary) {
-                    Button backButton = makeButton(font, "Volver al menu", {220.f, 60.f}, {340.f, 460.f});
-                    if (backButton.shape.getGlobalBounds().contains(mouse)) {
-                        state = AppState::MainMenu;
-                        infoMessage = "Pedido personal registrado correctamente.";
-                    }
-                }
-            }
+            if (event.type == sf::Event::Closed) window.close();
+            // actualizar estado de clickReleased si se soltó el botón
+            if (event.type == sf::Event::MouseButtonReleased) clickReleased = true;
+            mouse = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+            handleDateTimeSelection(window, font, mouse, event);
         }
-
-        sf::Vector2f mousePosition = window.mapPixelToCoords(sf::Mouse::getPosition(window));
-
-        if (state == AppState::MainMenu) {
-            updateButtonHover(personalButton, mousePosition);
-            updateButtonHover(multipleButton, mousePosition);
-        }
-
         window.clear(sf::Color(30, 30, 30));
-
-        if (state == AppState::MainMenu) {
-            sf::Text title = makeTitle(font, "Elige el tipo de pedido", 32, static_cast<float>(window.getSize().x), 120.f);
-            window.draw(title);
-            window.draw(personalButton.shape);
-            window.draw(personalButton.text);
-            window.draw(multipleButton.shape);
-            window.draw(multipleButton.text);
-        } else if (state == AppState::PersonalOrder) {
-            Button backButton = makeButton(font, "Volver al menu", {180.f, 46.f}, {20.f, 20.f});
-            updateButtonHover(backButton, mousePosition);
-            window.draw(backButton.shape);
-            window.draw(backButton.text);
-
-            std::string stepText;
-            if (personalStep == 0) {
-                stepText = "Paso 1 de 3: selecciona el dia para el pedido";
-            } else if (personalStep == 1) {
-                stepText = "Paso 2 de 3: selecciona el tipo de pedido";
-            } else if (personalStep == 2) {
-                stepText = "Paso 3 de 3: define la prioridad";
-            } else {
-                stepText = "Revisa tu seleccion antes de confirmar";
-            }
-
-            sf::Text title = makeTitle(font, stepText, 28, static_cast<float>(window.getSize().x), 120.f);
-            window.draw(title);
-
-            sf::Text recap("", font, 20);
-            recap.setFillColor(sf::Color(200, 200, 200));
-            recap.setPosition(80.f, 160.f);
-            std::ostringstream recapStream;
-            recapStream << "Dia: " << (selectedDay >= 0 ? dayOptions.at(selectedDay) : "-")
-                        << "   Tipo: " << (selectedType >= 0 ? typeOptions.at(selectedType) : "-")
-                        << "   Prioridad: " << (selectedPriority >= 0 ? priorityOptions.at(selectedPriority) : "-");
-            recap.setString(recapStream.str());
-            window.draw(recap);
-
-            if (personalStep < 3) {
-                const std::vector<std::string>* currentOptions = nullptr;
-                int highlightedIndex = -1;
-
-                if (personalStep == 0) {
-                    currentOptions = &dayOptions;
-                    highlightedIndex = selectedDay;
-                } else if (personalStep == 1) {
-                    currentOptions = &typeOptions;
-                    highlightedIndex = selectedType;
-                } else {
-                    currentOptions = &priorityOptions;
-                    highlightedIndex = selectedPriority;
-                }
-
-                for (std::size_t i = 0; i < currentOptions->size(); ++i) {
-                    sf::FloatRect bounds = computeOptionBounds(i, static_cast<float>(window.getSize().x),
-                                                               optionSize, optionStartY, optionSpacing);
-                    drawOption(window, font, currentOptions->at(i), bounds, mousePosition,
-                               highlightedIndex == static_cast<int>(i));
-                }
-            } else {
-                Button confirmButton = makeButton(font, "Confirmar pedido", {250.f, 60.f}, {325.f, 420.f});
-                Button resetButton = makeButton(font, "Reiniciar seleccion", {250.f, 46.f}, {325.f, 500.f});
-                updateButtonHover(confirmButton, mousePosition);
-                updateButtonHover(resetButton, mousePosition);
-
-                window.draw(confirmButton.shape);
-                window.draw(confirmButton.text);
-                window.draw(resetButton.shape);
-                window.draw(resetButton.text);
-            }
-        } else if (state == AppState::Summary) {
-            sf::Text title = makeTitle(font, "Resumen del pedido", 32, static_cast<float>(window.getSize().x), 100.f);
-            window.draw(title);
-
-            sf::Text summary(summaryText, font, 20);
-            summary.setFillColor(sf::Color(220, 220, 220));
-            summary.setPosition(140.f, 160.f);
-            window.draw(summary);
-
-            Button backButton = makeButton(font, "Volver al menu", {220.f, 60.f}, {340.f, 460.f});
-            updateButtonHover(backButton, mousePosition);
-            window.draw(backButton.shape);
-            window.draw(backButton.text);
-        }
-
-        if (!infoMessage.empty()) {
-            sf::Text info(infoMessage, font, 18);
-            info.setFillColor(sf::Color(200, 200, 0));
-            info.setPosition(40.f, static_cast<float>(window.getSize().y) - 60.f);
-            window.draw(info);
-        }
-
+        // Pasar un evento vacío en la fase de dibujo para que no se re-procesen
+        sf::Event noEvent;
+        handleDateTimeSelection(window, font, mouse, noEvent);
         window.display();
     }
-
     return 0;
 }

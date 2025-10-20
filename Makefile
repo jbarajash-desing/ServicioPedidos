@@ -9,9 +9,9 @@ BUILD_DIR := build
 EXEC := $(BUILD_DIR)/servicio
 
 # ==== SOURCE FILES ====
-SRC := $(shell find $(SRC_DIR) lib -name "*.cpp")
+SRC := $(shell find $(SRC_DIR) lib products -name "*.cpp")
 OBJ := $(SRC:%.cpp=$(BUILD_DIR)/%.o)
-INCLUDE := -Iinclude -Ilib/factory/include -Ilib/calendar/include
+INCLUDE := -Iinclude -Ilib/factory/include -Ilib/calendar/include -Iproducts/include
 
 # ==== RULES ====
 all: $(EXEC)
@@ -35,4 +35,3 @@ clean:
 	@rm -rf $(BUILD_DIR)/*
 
 .PHONY: all clean run
-
