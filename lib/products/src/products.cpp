@@ -1,4 +1,5 @@
 #include <iostream>
+#include "../include/products.hpp" // Esta linea es necesaria pra que reconozca la clase Products y Storage
 
 Products::Products() : id(0), name(""), HMade(0) {}
 Products::Products(int id_, const std::string& name_, int HMade_) : id(id_), name(name_), HMade(HMade_) {}
@@ -25,4 +26,5 @@ void initProducts() {
     storage.addProduct(laptop);
     storage.addProduct(microwave);
 }
+
 
