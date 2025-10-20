@@ -14,6 +14,8 @@ class Products {
         Products(int id, const std::string& name, int HMade);
         int getID() const;
         int getHMade() const;
+        std::string getName() const;  // <- NUEVO MÉTODO
+
 };
 
 class Storage {
@@ -22,6 +24,10 @@ class Storage {
     public:
         void addProduct(const Products& product);
         int getHMadebyId(int id) const;
+        std::vector<std::string> getProductNames() const;
+        std::vector<std::string> getProductNames() const;  // <- NUEVO MÉTODO
+
+
 };
 
 extern Storage storage;      // declaración del objeto global

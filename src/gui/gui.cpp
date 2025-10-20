@@ -92,17 +92,8 @@ const std::vector<std::string> monthOptions = {"Enero", "Febrero", "Marzo", "Abr
 const std::vector<int> daysPerMonth = {31,28,31,30,31,30,31,31,30,31,30,31};
 const std::vector<std::string> hourOptions = {"00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"};
 const std::vector<std::string> priorityOptions = {"Alta", "Media", "Baja"};
-std::vector<std::string> productList = []() {
-    std::vector<std::string> list;
-    if (fs::exists("products")) {
-        for (const auto& entry : fs::directory_iterator("products")) {
-            if (entry.is_regular_file()) {
-                list.push_back(entry.path().filename().string());
-            }
-        }
-    }
-    return list;
-}();
+std::vector<std::string> productList;
+
 
 int selectedMonth = -1;
 int selectedDay = -1;
@@ -298,6 +289,8 @@ int runGui() {
     }
 
     initProducts();
+    productList = storage.getProductNames();
+
 
     sf::Event event;
     sf::Vector2f mouse;

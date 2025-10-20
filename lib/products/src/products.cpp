@@ -5,6 +5,10 @@ Products::Products() : id(0), name(""), HMade(0) {}
 Products::Products(int id_, const std::string& name_, int HMade_) : id(id_), name(name_), HMade(HMade_) {}
 int Products::getID() const { return id; }
 int Products::getHMade() const { return HMade; }
+std::string Products::getName() const {
+    return name;
+}
+
 
 void Storage::addProduct(const Products& product) {
     productList.push_back(product);
@@ -15,6 +19,14 @@ int Storage::getHMadebyId(int id) const {
     }
     return -1;
 }
+std::vector<std::string> Storage::getProductNames() const {
+    std::vector<std::string> names;
+    for (const auto& p : productList) {
+        names.push_back(p.getName());
+    }
+    return names;
+}
+
 
 Storage storage; // definición del objeto global
 
