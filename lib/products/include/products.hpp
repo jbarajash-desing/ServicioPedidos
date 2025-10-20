@@ -26,7 +26,6 @@ class Storage {
         void addProduct(const Products& product);
         int getHMadebyId(int id) const;
         std::vector<std::string> getProductNames() const;
-        std::vector<std::string> getProductNames() const;  // <- NUEVO MÉTODO
 
 
 };
@@ -36,3 +35,4 @@ void initProducts();         // función para poblar el storage
 
 
 #endif
+
