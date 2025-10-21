@@ -10,11 +10,14 @@
 #include <chrono>
 #include "../../lib/factory/include/factory.hpp"
 #include "gui.hpp"
-#include "../../products/include/products.hpp"
+#include "../../lib/products/include/products.hpp"
+#include <list> 
+#include "../../lib/calendar/include/calendar.hpp"
 
+ 
 extern void initProducts();
 namespace fs = std::filesystem;
-
+Calendar calendar;
 namespace {
 using Clock = std::chrono::steady_clock;
 Clock::time_point lastKeyPress = Clock::now();
@@ -100,6 +103,8 @@ int selectedDay = -1;
 int selectedHour = -1;
 int selectedPriority = -1;
 int selectedProduct = -1;
+int optionstage=-1;
+std::vector <std::string> options={"Hacer pedido","Ver pedidos"};
 std::string clientName = "";
 bool typingName = false;
 int nextId = 1;
@@ -114,9 +119,31 @@ void handleDateTimeSelection(sf::RenderWindow& window, const sf::Font& font, con
         eventMousePos = window.mapPixelToCoords(sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
     }
 
+    if (event.type == sf::Event::MouseButtonReleased){
+        clickReleased = true;
+    }
+
+    if(optionstage==-1){
+        sf::Text title = makeTitle(font, "Selecciona una opcion", 28, 900.f, 60.f);
+        window.draw(title);
+        for(size_t i=0;i<options.size();++i){
+            sf::FloatRect bounds = computeGridBounds(i, 4, boxSize, 90.f, 120.f, spacingX, spacingY);
+            drawOptionBox(window, font, options[i], bounds, mousePosition, static_cast<int>(i) == optionstage);
+            if (event.type == sf::Event::MouseButtonPressed && bounds.contains(eventMousePos)) {
+                optionstage = static_cast<int>(i);
+                selectedMonth = selectedDay = selectedHour = selectedPriority = selectedProduct = -1;
+                clientName.clear();
+                typingName = false;
+                clickReleased = false;
+            }
+        }
+        return;
+    }
+
     // 1) Seleccionar mes
     if (selectedMonth == -1) {
-        sf::Text title = makeTitle(font, "Selecciona un mes", 28, 900.f, 60.f);
+        const std::string titleText = optionstage == 0 ? "Selecciona un mes" : "Selecciona un mes a consultar";
+        sf::Text title = makeTitle(font, titleText, 28, 900.f, 60.f);
         window.draw(title);
         for (size_t i = 0; i < monthOptions.size(); ++i) {
             sf::FloatRect bounds = computeGridBounds(i, 4, boxSize, 90.f, 120.f, spacingX, spacingY);
@@ -131,7 +158,8 @@ void handleDateTimeSelection(sf::RenderWindow& window, const sf::Font& font, con
 
     // 2) Seleccionar día
     if (selectedDay == -1) {
-        sf::Text title = makeTitle(font, "Selecciona un dia", 28, 900.f, 60.f);
+        const std::string titleText = optionstage == 0 ? "Selecciona un dia" : "Selecciona un dia a consultar";
+        sf::Text title = makeTitle(font, titleText, 28, 900.f, 60.f);
         window.draw(title);
         int days = daysPerMonth[selectedMonth];
         for (int i = 0; i < days; ++i) {
@@ -139,6 +167,40 @@ void handleDateTimeSelection(sf::RenderWindow& window, const sf::Font& font, con
             drawOptionBox(window, font, std::to_string(i + 1), bounds, mousePosition, i == selectedDay);
             if (event.type == sf::Event::MouseButtonPressed && bounds.contains(eventMousePos)) {
                 selectedDay = i;
+                clickReleased = false;
+            }
+        }
+        return;
+    }
+
+    if(optionstage==1){
+        std::ostringstream list= calendar.showDay(selectedMonth,selectedDay);
+        sf::Text title = makeTitle(font, "Pedidos del dia seleccionado", 26, 900.f, 60.f);
+        window.draw(title);
+        sf::Text listText(list.str(), font, 20);
+        listText.setFillColor(sf::Color::White);
+        listText.setPosition(80.f, 120.f);
+        window.draw(listText);
+
+        sf::Vector2f btnSize(200.f, 50.f);
+        Button chooseAnother = makeButton(font, "Elegir otra fecha", btnSize, {340.f, 400.f});
+        Button backToMenu = makeButton(font, "Menu principal", btnSize, {580.f, 400.f});
+        updateButtonHover(chooseAnother, mousePosition);
+        updateButtonHover(backToMenu, mousePosition);
+        window.draw(chooseAnother.shape);
+        window.draw(chooseAnother.text);
+        window.draw(backToMenu.shape);
+        window.draw(backToMenu.text);
+
+        if (event.type == sf::Event::MouseButtonPressed) {
+            if (chooseAnother.shape.getGlobalBounds().contains(eventMousePos)) {
+                selectedMonth = selectedDay = -1;
+                clickReleased = false;
+            } else if (backToMenu.shape.getGlobalBounds().contains(eventMousePos)) {
+                optionstage = -1;
+                selectedMonth = selectedDay = selectedHour = selectedPriority = selectedProduct = -1;
+                clientName.clear();
+                typingName = false;
                 clickReleased = false;
             }
         }
@@ -258,9 +320,11 @@ void handleDateTimeSelection(sf::RenderWindow& window, const sf::Font& font, con
         if (event.type == sf::Event::MouseButtonPressed) {
             if (confirm.shape.getGlobalBounds().contains(eventMousePos)) {
                 // Confirmar pedido: guardar o procesar
+                Package pkg=Package(nextId,clientName,"deposited");
+                calendar.addPackage(selectedMonth, selectedDay, selectedHour, pkg);
                 nextId++;
                 // Reiniciar estado para nuevo pedido
-                selectedMonth = selectedDay = selectedHour = selectedPriority = selectedProduct = -1;
+                optionstage=selectedMonth = selectedDay = selectedHour = selectedPriority = selectedProduct = -1;
                 clientName.clear();
                 typingName = false;
             } else if (cancel.shape.getGlobalBounds().contains(eventMousePos)) {
@@ -270,11 +334,7 @@ void handleDateTimeSelection(sf::RenderWindow& window, const sf::Font& font, con
             clickReleased = false;
         }
     }
-
-    if (event.type == sf::Event::MouseButtonReleased)
-        clickReleased = true;
 }
-
 } // namespace
 
 int runGui() {

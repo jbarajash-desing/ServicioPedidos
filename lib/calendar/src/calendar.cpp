@@ -1,48 +1,57 @@
 #include "calendar.hpp"
+#include <sstream>
 
-// Constructor por defecto
+// Constructor: construir schedule con 12 meses y cada mes con daysPerMonth[mes] días
 Calendar::Calendar() {
-    // No se requiere inicialización adicional porque usamos arreglos fijos
+    schedule.clear();
+    schedule.resize(12);
+    for (int m = 0; m < 12; ++m) {
+        int days = daysPerMonth[m];
+        schedule[m].resize(days);
+        for (int d = 0; d < days; ++d) {
+            // cada día tiene un array de 24 horas; se construye vacío por defecto
+            schedule[m][d] = std::array<Hour,24>();
+        }
+    }
 }
 
-// Agrega un solo paquete al calendario en una hora específica
-void Calendar::addPackage(int month, int day, int hour, const Package& p) {
-    schedule[month][day][hour].push_back(p);
+// Agrega un item genérico (por ejemplo Package) al calendario en una hora específica
+void Calendar::addItem(int month, int day, int hour, std::shared_ptr<CalendarItem> item) {
+    if (month < 0 || month >= 12) return;
+    if (day < 0 || day >= (int)schedule[month].size()) return;
+    if (hour < 0 || hour >= 24) return;
+    schedule[month][day][hour].push_back(std::move(item));
 }
 
-// Recibe un arreglo de 24 horas con listas de paquetes, y lo almacena en el calendario
+// Conveniencia: agregar Package concreto
+void Calendar::addPackage(int month, int day, int hour, const Package& pkg) {
+    addItem(month, day, hour, std::make_shared<Package>(pkg));
+}
+
+// Recibe un arreglo de 24 horas con listas de items, y lo almacena en el calendario
 void Calendar::storeDay(int year, int month, int day, const Hour externalHours[24]) {
-    // Recorre las 24 horas del día recibido
+    if (month < 0 || month >= 12) return;
+    if (day < 0 || day >= (int)schedule[month].size()) return;
     for (int h = 0; h < 24; ++h) {
-        for (const auto& pkg : externalHours[h]) {
-            schedule[month][day][h].push_back(pkg);
+        for (const auto& itemPtr : externalHours[h]) {
+            schedule[month][day][h].push_back(itemPtr);
         }
     }
-    // Nota: el parámetro 'year' no se usa porque solo trabajamos con un año fijo (puede ser extendido)
 }
 
-// Muestra todos los paquetes del día, separados por "deposited" y "delivered"
-void Calendar::showDay(int month, int day) const {
-    list<Package> deposited;
-    list<Package> delivered;
+// Muestra todos los items del día usando info() de cada item
+std::ostringstream Calendar::showDay(int month, int day) const {
+    std::ostringstream oss;
+    if (month < 0 || month >= 12) return oss;
+    if (day < 0 || day >= (int)schedule[month].size()) return oss;
 
-    // Recorre cada hora del día seleccionado
+    oss << "\nItems del día " << (day+1) << " del mes " << (month+1) << "\n";
     for (int h = 0; h < 24; ++h) {
-        for (const auto& pkg : schedule[month][day][h]) {
-            if (pkg.status == "deposited")
-                deposited.push_back(pkg);
-            else if (pkg.status == "delivered")
-                delivered.push_back(pkg);
+        oss << "Hora " << h << ":\n";
+        for (const auto& itemPtr : schedule[month][day][h]) {
+            if (itemPtr) oss << "  - " << itemPtr->info() << "\n";
         }
     }
 
-    // Mostrar paquetes depositados
-    cout << "\nDeposited Packages:\n";
-    for (const auto& p : deposited)
-        cout << "ID: " << p.id << " | Client: " << p.client << endl;
-
-    // Mostrar paquetes entregados
-    cout << "\nDelivered Packages:\n";
-    for (const auto& p : delivered)
-        cout << "ID: " << p.id << " | Client: " << p.client << endl;
+    return oss;
 }

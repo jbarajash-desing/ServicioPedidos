@@ -1,5 +1,6 @@
 #ifndef PRODUCTS_HPP
 #define PRODUCTS_HPP
+#include <vector>
 
 #include <string>
 #include <list>
@@ -25,7 +26,6 @@ class Storage {
         void addProduct(const Products& product);
         int getHMadebyId(int id) const;
         std::vector<std::string> getProductNames() const;
-        std::vector<std::string> getProductNames() const;  // <- NUEVO MÉTODO
 
 
 };
