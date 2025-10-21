@@ -1,7 +1,4 @@
 #include "../include/factory.hpp"
-std::vector<Order> Factory::getLastBatch() {
-    return lastBatch; // o como guardes el último lote
-}
 // -------------------------------------------------------------
 // Implementación de la clase Order
 // -------------------------------------------------------------
@@ -51,7 +48,7 @@ bool CircularQueue::isEmpty() const {
 // -------------------------------------------------------------
 // Implementación de la clase Factory
 // -------------------------------------------------------------
-Factory::Factory(int quantum) : mediumPriority(quantum) {}
+Factory::Factory(int quantum) : mediumPriority(quantum), currentBatchTime(0) {}
 
 // Recibe los pedidos distribuidos por hora (24 horas)
 void Factory::receiveOrders(std::vector<std::vector<Order>>& ordersPerHour) {
@@ -104,33 +101,59 @@ void Factory::process() {
         completedOrders.push_back(o);
     }
 
-    // 4️⃣ Agregar los pedidos completados a la cola de salida
-    outputQueue.push(completedOrders);
-    lastBatch = completedOrders;
-}
-
-// Muestra el estado de las colas
-void Factory::showQueues() {
-    std::cout << "=== Current Queues ===" << std::endl;
-    std::cout << "High Priority: " << highPriority.size() << " orders" << std::endl;
-    std::cout << "Medium Priority: (cannot show count easily from circular queue)" << std::endl;
-    std::cout << "Low Priority: " << lowPriority.size() << " orders" << std::endl;
-}
-
-// Muestra los pedidos completados
-void Factory::showOutput() {
-    std::cout << "=== Completed Orders ===" << std::endl;
-    int batch = 1;
-    std::queue<std::vector<Order>> temp = outputQueue;
-
-    while (!temp.empty()) {
-        auto list = temp.front();
-        temp.pop();
-
-        std::cout << "Batch " << batch++ << ":" << std::endl;
-        for (auto& o : list) {
-            std::cout << " - " << o.name << " (urgency " << o.urgency << ")" << std::endl;
+    for (auto& order : completedOrders) {
+        // Si agregar este pedido excede 24 horas, crear nuevo lote
+        if (currentBatchTime + order.fabricationTime > 24) {
+            if (!currentBatch.empty()) {
+                outputQueue.push(currentBatch);  // Guardar lote completo
+                currentBatch.clear();
+                currentBatchTime = 0;
+               }
         }
-        std::cout << std::endl;
+        // Agregar pedido al lote actual
+        currentBatch.push_back(order);
+        currentBatchTime += order.fabricationTime;
+    }
+    lastBatch = completedOrders;
+    flushBatch();
+}
+
+std::vector<Order> Factory::getNext24hBatch() {
+    if (!outputQueue.empty()) {
+        auto batch = outputQueue.front();
+        outputQueue.pop();
+        return batch;
+    }
+    return std::vector<Order>{};
+}
+
+void Factory::flushBatch() {
+    if (!currentBatch.empty()) {
+        outputQueue.push(currentBatch);
+        currentBatch.clear();
+        currentBatchTime = 0;
     }
 }
+
+void Factory::printBatchStatus() {
+    std::cout << "Lote actual: " << currentBatch.size() << " pedidos, " 
+              << currentBatchTime << "/24 horas" << std::endl;
+    std::cout << "Lotes completos en cola: " << outputQueue.size() << std::endl;
+}
+
+std::vector<Order> Factory::getLastBatch() {
+    return lastBatch; // o como guardes el último lote
+}
+std::vector<std::vector<Order>> Factory::getAllBatchesAsVector() const {
+    std::vector<std::vector<Order>> result;
+    auto tempQueue = outputQueue;  // Hacemos una copia para no modificar la original
+    
+    // Transferimos todos los lotes de la cola al vector
+    while (!tempQueue.empty()) {
+        result.push_back(tempQueue.front());
+        tempQueue.pop();
+    }
+    
+    return result;
+}
+
