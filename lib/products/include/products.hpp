@@ -4,6 +4,7 @@
 
 #include <string>
 #include <list>
+#include <vector>
 
 class Products {
     private:
@@ -33,4 +34,6 @@ class Storage {
 extern Storage storage;      // declaración del objeto global
 void initProducts();         // función para poblar el storage
 
+
 #endif
+
