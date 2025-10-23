@@ -2,10 +2,10 @@
 
 ## 🧩 Descripción  
 Aplicación desarrollada en **C++** que permite gestionar pedidos de clientes mediante una interfaz gráfica intuitiva.  
-El sistema organiza los pedidos por fecha y hora, utilizando estructuras de datos eficientes para su almacenamiento y consulta.
+El sistema organiza los pedidos por fecha y hora, utilizando estructuras de datos (listas, colas, colas con prioridad) eficientes para su almacenamiento y consulta.
 
 ## ⚙️ Funcionalidades  
-- 📝 Registro y edición de pedidos  
+- 📝 Registro de pedidos  
 - 📅 Visualización por fecha y hora  
 - 💾 Almacenamiento estructurado (mes / día / hora)  
 - 🖥️ Interfaz gráfica amigable para el usuario  
