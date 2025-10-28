@@ -1,8 +1,8 @@
-# 📦 Sistema de Gestión de Pedidos – Proyecto de Estructuras de Datos
+# 📦 Sistema de Gestión de Pedidos
 
 ## 🧩 Descripción general
 Este proyecto implementa un **sistema de gestión de pedidos** desarrollado en **C++**, diseñado para simular el registro, almacenamiento y procesamiento de pedidos a lo largo del año.  
-El sistema fue construido siguiendo principios de **estructuras de datos** vistas en clase: listas, colas, colas con prioridad y arreglos multidimensionales.
+El sistema fue construido siguiendo principios de **estructuras de datos** vistas en clase: listas, colas, colas con prioridad y arreglos.
 
 ---
 
