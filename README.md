@@ -4,8 +4,6 @@
 Este proyecto implementa un **sistema de gestión de pedidos** desarrollado en **C++**, diseñado para simular el registro, almacenamiento y procesamiento de pedidos a lo largo del año.  
 El sistema fue construido siguiendo principios de **estructuras de datos** vistas en clase: listas, colas, colas con prioridad y arreglos multidimensionales.
 
-Inicialmente contaba con una interfaz gráfica (SFML), pero la versión actual opera **por terminal**, enfocándose en la **lógica del calendario y la administración de pedidos**.
-
 ---
 
 ## ⚙️ Características principales
@@ -30,4 +28,4 @@ Para compilar el proyecto:
 ```bash
 make
 ```
-## 📊[Presentación] (https://www.canva.com/design/DAG3ASmarns/QmnYjO-q_h9pp_3mQSYIAA/edit?utm_content=DAG3ASmarns&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
+## 📊[Presentación](https://www.canva.com/design/DAG3ASmarns/QmnYjO-q_h9pp_3mQSYIAA/edit?utm_content=DAG3ASmarns&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
