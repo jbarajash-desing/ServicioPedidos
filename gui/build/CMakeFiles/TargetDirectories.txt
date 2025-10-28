@@ -1,0 +1,3 @@
+/home/johan/Vs_code/estructuras_de_datos/ServicioPedidos/gui/build/CMakeFiles/FactoryApp.dir
+/home/johan/Vs_code/estructuras_de_datos/ServicioPedidos/gui/build/CMakeFiles/edit_cache.dir
+/home/johan/Vs_code/estructuras_de_datos/ServicioPedidos/gui/build/CMakeFiles/rebuild_cache.dir
